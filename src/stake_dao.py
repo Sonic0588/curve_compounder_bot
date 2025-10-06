@@ -1,10 +1,15 @@
 import logging
-import time
 
 from web3 import Web3
 
 import abis
-from addresses import GMAC_CRVUSD_ETH_POOL_ADDRESS, GMAC_CRVUSD_ETH_STAKE_DAO_VAULT_ADDRESS, ZERO_ADDRESS
+from addresses import (
+    GMAC_CRVUSD_ETH_GAUGE_ADDRESS,
+    GMAC_CRVUSD_ETH_POOL_ADDRESS,
+    GMAC_CRVUSD_ETH_STAKE_DAO_VAULT_ADDRESS,
+    STAKE_DAO_HARVESTER_ADDRESS,
+    ZERO_ADDRESS,
+)
 from config import ARBITRUM_RPC, PRIVATE_KEY, WALLET_ADDRESS
 from utils import build_approve_tx, get_allowance, get_gas_fees, send_tx
 
@@ -24,6 +29,23 @@ def build_deposit_tx(web3: Web3, wallet_address, vault_address, amount):
     )
 
     tx = contract.functions.deposit(amount, ZERO_ADDRESS).build_transaction(
+        {
+            "from": wallet_address,
+            "nonce": web3.eth.get_transaction_count(wallet_address),
+            **get_gas_fees(web3),
+        }
+    )
+
+    return tx
+
+
+def build_claim_tx(web3: Web3, wallet_address, gauges_addresses):
+    contract = web3.eth.contract(
+        address=STAKE_DAO_HARVESTER_ADDRESS,
+        abi=abis.STAKE_DAO_HARVERSTER,
+    )
+
+    tx = contract.functions.claim(gauges_addresses, [b"0x"]).build_transaction(
         {
             "from": wallet_address,
             "nonce": web3.eth.get_transaction_count(wallet_address),
@@ -68,11 +90,12 @@ if __name__ == "__main__":
         )
 
         tx_hash = send_tx(web3, approve_tx, PRIVATE_KEY)
-
         logger.info(f"Транзакция разрешения: {tx_hash}")
-        time.sleep(30)  # Ждем подтверждения
 
-    # Совершаем добавление ликвидности
+        receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
+        logger.info(f"Разрешение добавлено: {receipt}")
+
+    # # Совершаем добавление ликвидности
     add_liquidity_tx = build_deposit_tx(
         web3=web3,
         wallet_address=WALLET_ADDRESS,
@@ -82,3 +105,19 @@ if __name__ == "__main__":
 
     add_liquidity_tx_hash = send_tx(web3, add_liquidity_tx, PRIVATE_KEY)
     logger.info(f"Транзакция депозита LP токена в vault: {add_liquidity_tx_hash}")
+    receipt = web3.eth.wait_for_transaction_receipt(add_liquidity_tx_hash)
+    logger.info(f"LP токен добавлен: {receipt}")
+
+    # Собираем награды
+    claim_tx = build_claim_tx(
+        web3=web3,
+        wallet_address=WALLET_ADDRESS,
+        gauges_addresses=[
+            GMAC_CRVUSD_ETH_GAUGE_ADDRESS,
+        ],
+    )
+
+    claim_tx_hash = send_tx(web3, claim_tx, PRIVATE_KEY)
+    logger.info(f"Транзакция сбора наград: {claim_tx_hash}")
+    receipt = web3.eth.wait_for_transaction_receipt(claim_tx_hash)
+    logger.info(f"Награды собраны: {receipt}")

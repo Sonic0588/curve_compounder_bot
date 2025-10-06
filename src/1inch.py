@@ -1,5 +1,4 @@
 import logging
-import time
 
 import requests
 from web3 import Web3
@@ -109,9 +108,10 @@ if __name__ == "__main__":
         )
 
         tx_hash = send_tx(web3, approve_tx, PRIVATE_KEY)
-
         logger.info(f"Транзакция разрешения: {tx_hash}")
-        time.sleep(30)  # Ждем подтверждения
+
+        receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
+        logger.info(f"Разрешение добавлено: {receipt}")
 
     # Совершаем обмен
     swap_tx = build_swap_tx(
