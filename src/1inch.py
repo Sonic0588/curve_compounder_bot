@@ -79,7 +79,7 @@ def build_swap_tx(wallet_address, from_token, to_token, amount, slippage=0.1):
 
 # Основная логика
 if __name__ == "__main__":
-    amount = int(input("Введите количество CRV для обмена: ")) * 10**18
+    amount = int(float(input("Введите количество CRV для обмена: ")) * 10**18)
 
     # Проверяем баланс
     crv_contract = web3.eth.contract(address=Web3.to_checksum_address(CRV_ADDRESS), abi=abis.ERC20)
