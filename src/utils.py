@@ -14,11 +14,11 @@ def get_gas_fees(web3: Web3):
     if rewards:
         mid = len(rewards) // 2
         priority = rewards[mid] if len(rewards) % 2 else (rewards[mid - 1] + rewards[mid]) // 2
-        priority = int(priority * random.uniform(1.03, 1.1))
+        priority = int(priority * random.uniform(1.01, 1.03))
 
     return {
         "maxPriorityFeePerGas": priority,
-        "maxFeePerGas": max(base_fee + priority, int(base_fee * 1.15)),
+        "maxFeePerGas": max(base_fee + priority, int(base_fee * 1.05)),
     }
 
 
