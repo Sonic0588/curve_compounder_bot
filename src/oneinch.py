@@ -57,7 +57,7 @@ def build_swap_tx(wallet_address, from_token, to_token, amount, slippage=0.1):
 
     response = requests.get(url, headers=headers, params=params)
     swap_data = response.json()
-    logger.info(swap_data)
+    logger.debug(swap_data)
 
     tx = swap_data["tx"]
     del tx["gasPrice"]
@@ -111,7 +111,7 @@ if __name__ == "__main__":
         logger.info(f"Транзакция разрешения: {tx_hash}")
 
         receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
-        logger.info(f"Разрешение добавлено: {receipt}")
+        logger.debug(f"Разрешение добавлено: {receipt}")
 
     # Совершаем обмен
     swap_tx = build_swap_tx(

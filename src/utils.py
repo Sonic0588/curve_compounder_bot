@@ -1,8 +1,17 @@
+import logging
 import random
 
 from web3 import Web3
 
 import abis
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
 
 
 def get_gas_fees(web3: Web3):
@@ -58,3 +67,31 @@ def get_allowance(web3: Web3, wallet_address, token_address, spender):
     )
 
     return contract.functions.allowance(Web3.to_checksum_address(wallet_address), spender).call()
+
+
+def approve(web3: Web3, wallet_address, token_address, spender, balance, private_key):
+    allowance = get_allowance(
+        web3=web3,
+        wallet_address=wallet_address,
+        token_address=token_address,
+        spender=spender,
+    )
+
+    if allowance >= balance:
+        return
+
+    approve_tx = build_approve_tx(
+        web3=web3,
+        wallet_address=wallet_address,
+        token_address=token_address,
+        spender=spender,
+        amount=balance,
+    )
+
+    tx_hash = send_tx(web3, approve_tx, private_key)
+    logger.info(f"Транзакция разрешения: {tx_hash}")
+
+    receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
+    logger.debug(f"Разрешение добавлено: {receipt}")
+
+    return receipt

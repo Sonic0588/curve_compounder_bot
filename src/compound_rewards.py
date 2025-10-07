@@ -15,7 +15,7 @@ from config import ARBITRUM_RPC, PRIVATE_KEY, WALLET_ADDRESS
 from curve import build_add_liquidity_tx
 from oneinch import build_swap_tx, get_quote
 from stake_dao import build_claim_tx, build_deposit_tx
-from utils import build_approve_tx, get_allowance, send_tx
+from utils import approve, send_tx
 
 
 logging.basicConfig(
@@ -51,34 +51,22 @@ def main():
     # Меняем весь собранный CRV на crvUSD
     crv_contract = web3.eth.contract(address=Web3.to_checksum_address(CRV_ADDRESS), abi=abis.ERC20)
     crv_balance = crv_contract.functions.balanceOf(WALLET_ADDRESS).call()
-    logger.info(f"CRV balance: {crv_balance}")
+    logger.info(f"CRV balance: {Web3.from_wei(crv_balance, 'ether'):.4f}")
 
     quote = get_quote(CRV_ADDRESS, CRVUSD_ADDRESS, crv_balance)
     logger.info(f"Получим примерно: {int(quote['dstAmount']) / 10**18} crvUSD")
 
-    allowance = get_allowance(
+    approved_crv = approve(
         web3=web3,
         wallet_address=WALLET_ADDRESS,
         token_address=CRV_ADDRESS,
         spender=ONEINCH_ROUTER_ADDRESS,
+        balance=crv_balance,
+        private_key=PRIVATE_KEY,
     )
 
-    if allowance < crv_balance:
-        logger.info("Выдаем разрешение...")
-        approve_tx = build_approve_tx(
-            web3=web3,
-            wallet_address=WALLET_ADDRESS,
-            token_address=CRV_ADDRESS,
-            spender=ONEINCH_ROUTER_ADDRESS,
-            amount=crv_balance,
-        )
-
-        tx_hash = send_tx(web3, approve_tx, PRIVATE_KEY)
-        logger.info(f"Транзакция разрешения: {tx_hash}")
-
-        receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
-        TOTAL_GAS_SPENT += receipt["gasUsed"] * receipt["effectiveGasPrice"]
-        logger.debug(f"Разрешение добавлено: {receipt}")
+    if approved_crv:
+        TOTAL_GAS_SPENT += approved_crv["gasUsed"] * approved_crv["effectiveGasPrice"]
 
     swap_tx = build_swap_tx(
         wallet_address=WALLET_ADDRESS,
@@ -96,31 +84,19 @@ def main():
     # Добавляем весь crvUSD в пул GMAC/crvUSD/ETH
     crvUSD_contract = web3.eth.contract(address=CRVUSD_ADDRESS, abi=abis.ERC20)
     crvUSD_balance = crvUSD_contract.functions.balanceOf(WALLET_ADDRESS).call()
-    logger.info(f"crvUSD balance: {crvUSD_balance}")
+    logger.info(f"crvUSD balance: {Web3.from_wei(crvUSD_balance, 'ether'):.4f}")
 
-    allowance = get_allowance(
+    approved_crvUSD = approve(
         web3=web3,
         wallet_address=WALLET_ADDRESS,
         token_address=CRVUSD_ADDRESS,
         spender=GMAC_CRVUSD_ETH_POOL_ADDRESS,
+        balance=crvUSD_balance,
+        private_key=PRIVATE_KEY,
     )
 
-    if allowance < crvUSD_balance:
-        logger.info("Выдаем разрешение...")
-        approve_tx = build_approve_tx(
-            web3=web3,
-            wallet_address=WALLET_ADDRESS,
-            token_address=CRVUSD_ADDRESS,
-            spender=GMAC_CRVUSD_ETH_POOL_ADDRESS,
-            amount=crvUSD_balance,
-        )
-
-        tx_hash = send_tx(web3, approve_tx, PRIVATE_KEY)
-        logger.info(f"Транзакция разрешения: {tx_hash}")
-
-        receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
-        TOTAL_GAS_SPENT += receipt["gasUsed"] * receipt["effectiveGasPrice"]
-        logger.debug(f"Разрешение добавлено: {receipt}")
+    if approved_crvUSD:
+        TOTAL_GAS_SPENT += approved_crvUSD["gasUsed"] * approved_crvUSD["effectiveGasPrice"]
 
     # Совершаем добавление ликвидности
     add_liquidity_tx = build_add_liquidity_tx(
@@ -139,31 +115,19 @@ def main():
     # Добавляем полученные LP токены в Vault StakeDAO
     lp_token_contract = web3.eth.contract(address=GMAC_CRVUSD_ETH_POOL_ADDRESS, abi=abis.ERC20)
     lp_token_balance = lp_token_contract.functions.balanceOf(WALLET_ADDRESS).call()
-    logger.info(f"TriGemach balance: {lp_token_balance}")
+    logger.info(f"TriGemach balance: {Web3.from_wei(lp_token_balance, 'ether'):.4f}")
 
-    allowance = get_allowance(
+    approved_LP = approve(
         web3=web3,
         wallet_address=WALLET_ADDRESS,
         token_address=GMAC_CRVUSD_ETH_POOL_ADDRESS,
         spender=GMAC_CRVUSD_ETH_STAKE_DAO_VAULT_ADDRESS,
+        balance=lp_token_balance,
+        private_key=PRIVATE_KEY,
     )
 
-    if allowance < lp_token_balance:
-        logger.info("Выдаем разрешение...")
-        approve_tx = build_approve_tx(
-            web3=web3,
-            wallet_address=WALLET_ADDRESS,
-            token_address=GMAC_CRVUSD_ETH_POOL_ADDRESS,
-            spender=GMAC_CRVUSD_ETH_STAKE_DAO_VAULT_ADDRESS,
-            amount=lp_token_balance,
-        )
-
-        tx_hash = send_tx(web3, approve_tx, PRIVATE_KEY)
-        logger.info(f"Транзакция разрешения: {tx_hash}")
-
-        receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
-        TOTAL_GAS_SPENT += receipt["gasUsed"] * receipt["effectiveGasPrice"]
-        logger.debug(f"Разрешение добавлено: {receipt}")
+    if approved_LP:
+        TOTAL_GAS_SPENT += approved_LP["gasUsed"] * approved_LP["effectiveGasPrice"]
 
     deposit_tx = build_deposit_tx(
         web3=web3,
